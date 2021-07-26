@@ -1,0 +1,140 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  log-redis-server
+
+  Sample SAM Template for log-redis-server
+
+  
+Parameters:
+  domainName:
+    Type: String
+    Description: domainName
+    Default: domainName
+  domainACM:
+    Type: String
+    Description: domainACM
+    Default: domainACM
+  
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    Timeout: 180
+    MemorySize: 128
+    
+    VpcConfig:
+      SecurityGroupIds: 
+        - !GetAtt CacheSecurityGroup.GroupId
+      SubnetIds: 
+        - subnet-060c10ab545a96a27
+        - subnet-0f1b180e0b14f8dab
+        - subnet-0effea65b70b871a8
+        - subnet-72cce72e
+
+Resources:
+
+  # role 
+  FullAccess2:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AdministratorAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+
+  RedisCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheNodeType: cache.t2.small
+      VpcSecurityGroupIds:
+        - !GetAtt CacheSecurityGroup.GroupId
+      Engine: redis
+      NumCacheNodes: 1
+      
+  CacheSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Cache security group
+      
+  CacheSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !GetAtt CacheSecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: !GetAtt RedisCluster.RedisEndpoint.Port
+      ToPort: !GetAtt RedisCluster.RedisEndpoint.Port
+      SourceSecurityGroupId: !GetAtt CacheSecurityGroup.GroupId
+
+  logApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name : logApi
+      StageName: Prod
+      Cors:
+        AllowMethods: "'GET,POST,DELETE'"
+        AllowHeaders: "'Content-Type, Authorization, Content-Length, x-requested-with'"
+        AllowOrigin: "'*'"
+      Domain:
+        DomainName: !Ref domainName
+        CertificateArn: !Ref domainACM
+        EndpointConfiguration: REGIONAL
+        BasePath:
+          - /
+
+  ExpressFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: express/
+      Handler: index.handler
+      Role: !GetAtt FullAccess2.Arn
+      Environment:
+        Variables:
+          REDIS_ADDRESS: !Sub "${RedisCluster.RedisEndpoint.Address}"
+          BASE_PATH: "/Prod/"
+          SCHEMES: "https"
+          S3_PATH: !Ref LogBucket
+      Events:
+        BackendApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref logApi
+            Path: /{proxy+}
+            Method: ANY
+    
+  syncFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: sync/
+      Handler: app.get
+      Role: !GetAtt FullAccess2.Arn
+      Environment:
+        Variables:
+          REDIS_ADDRESS: !Sub "${RedisCluster.RedisEndpoint.Address}"
+          S3_PATH: !Ref LogBucket
+      Events:
+        OnedayReset:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0/30 * ? * * *)
+            Description: 30minute
+            Enabled: True
+            
+  LogBucket:
+    Type: AWS::S3::Bucket
+
+
+Outputs:
+  ApiURL:
+    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+    Value: !Sub "https://${logApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
