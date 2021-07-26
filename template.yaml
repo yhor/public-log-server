@@ -27,10 +27,10 @@ Globals:
       SecurityGroupIds: 
         - !GetAtt CacheSecurityGroup.GroupId
       SubnetIds: 
-        - subnet-060c10ab545a96a27
-        - subnet-0f1b180e0b14f8dab
-        - subnet-0effea65b70b871a8
-        - subnet-72cce72e
+        - subnet-xxxxxxxxxxxxxxxxx
+        - subnet-xxxxxxxxxxxxxxxxx
+        - subnet-xxxxxxxxxxxxxxxxx
+        - subnet-xxxxxxxx
 
 Resources:
 
