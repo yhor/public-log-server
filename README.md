@@ -71,7 +71,7 @@ AWS Redis는 기본적으로 외부에서 접근이 차단외어있어 접근 �
     aws lambda publish-layer-version --layer-name XXXXXX --zip-file fileb://nodejs.zip --compatible-runtimes nodejs12.x nodejs10.x --description desc
   ```
 
-3.빌드 배포
+3. 빌드 배포
 
   기본적으로 SAM 을 기반으로 빌드 배포 한다.
 
