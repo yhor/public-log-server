@@ -35,12 +35,11 @@ const log_sync = async () => {
 
 		const log_text = await get_logs(key, result.length);
 
-		const fileName1 = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD');
-		const fileName2 = dayjs().tz('Asia/Seoul').format('HH:mm:ss');
+		const fileName = dayjs().tz('Asia/Seoul').format('YYYY-MM-DD/HH:mm:ss');
 		
 		const param = {
 			Bucket: process.env.S3_PATH || "log-redis-logbucket-phsle8mf872u",
-			Key: `${key}/${fileName1}/${fileName2}.txt`,
+			Key: `${key}/${fileName}.txt`,
 			'ACL': 'public-read',
 			'Body': log_text.join('\n')
 		}
